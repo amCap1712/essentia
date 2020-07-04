@@ -54,6 +54,10 @@ def options(ctx):
                    dest='ARCH', default="x64",
                    help='Target architecture when compiling on OSX: i386, x64 or FAT')
 
+    ctx.add_option('--android-abi', action='store',
+                   dest='ANDROID_ABI', default='arm',
+                   help='Target ABI when cross compiling for Android: aarch64, armv7a, i686, x86_64')
+
     ctx.add_option('--no-msse', action='store_true',
                    dest='NO_MSSE', default=False,
                    help='never add compiler flags for msse')
@@ -129,8 +133,8 @@ def configure(ctx):
     # force using SSE floating point (default for 64bit in gcc) instead of
     # 387 floating point (used for 32bit in gcc) to avoid numerical differences
     # between 32 and 64bit builds (see https://github.com/MTG/essentia/issues/179)
-    if (not ctx.options.EMSCRIPTEN and 
-        not ctx.options.CROSS_COMPILE_ANDROID and 
+    if (not ctx.options.EMSCRIPTEN and
+        not ctx.options.CROSS_COMPILE_ANDROID and
         not ctx.options.CROSS_COMPILE_IOS and
         not ctx.options.NO_MSSE and
         sys.platform != 'win32'):
@@ -221,7 +225,7 @@ def configure(ctx):
         # force the use of mingw gcc compiler instead of msvc
         #ctx.env.CC = 'gcc'
         #ctx.env.CXX = 'g++'
-        
+
         import distutils.dir_util
 
         print("copying pkgconfig ...")
@@ -235,14 +239,23 @@ def configure(ctx):
         """
 
     if ctx.options.CROSS_COMPILE_ANDROID:
-        print ("→ Cross-compiling for Android ARM")
-        # GCC is depricated for Android NDK
-        # Use clang with libc++
-        #ctx.find_program('arm-linux-androideabi-gcc', var='CC')
-        #ctx.find_program('arm-linux-androideabi-g++', var='CXX')
-        #ctx.find_program('arm-linux-androideabi-ar', var='AR')
-        ctx.find_program('clang', var='CC')
-        ctx.find_program('clang++', var='CXX')
+        print ("→ Cross-compiling for Android")
+        if ctx.options.ANDROID_ABI == 'arm64-v8a':
+            ctx.find_program('aarch64-linux-android21-clang', var='CC')
+            ctx.find_program('aarch64-linux-android21-clang++', var='CXX')
+        elif ctx.options.ANDROID_ABI == 'armeabi-v7a':
+            ctx.find_program('armv7a-linux-androideabi21-clang', var='CC')
+            ctx.find_program('armv7a-linux-androideabi21-clang++', var='CXX')
+        elif ctx.options.ANDROID_ABI == 'x86':
+            ctx.find_program('i686-linux-android21-clang', var='CC')
+            ctx.find_program('i686-linux-android21-clang++', var='CXX')
+        elif ctx.options.ANDROID_ABI == 'x86_64':
+            ctx.find_program('x86_64-linux-android21-clang', var='CC')
+            ctx.find_program('x86_64-linux-android21-clang++', var='CXX')
+        else:
+            raise ValueError('--android-abi not set or set to an incorrect option')
+        ctx.env.BUILD_STATIC = True
+        ctx.env.STATIC_DEPENDENCIES = True
         ctx.env.CXXFLAGS += ['-std=c++11']
         ctx.env.LINKFLAGS += ['-Wl,-soname,libessentia.so', '-latomic']
 
